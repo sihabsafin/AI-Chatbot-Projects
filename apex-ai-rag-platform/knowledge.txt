@@ -1,0 +1,16 @@
+Apex AI is an advanced AI chatbot powered by Groq's Llama 3.3 70B model.
+   
+   Features:
+   - Fast AI responses using Groq infrastructure
+   - RAG (Retrieval Augmented Generation) for accurate answers
+   - Document upload and processing
+   - Conversation memory for contextual responses
+   - Free plan with 100 messages and 10 documents
+   - Premium plan with unlimited usage
+   
+   Premium Plan Benefits:
+   - Unlimited messages
+   - Unlimited document uploads
+   - Priority support
+   - Advanced features
+   - Only $9.99 per month
