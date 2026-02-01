@@ -12,7 +12,7 @@
 [![Firebase](https://img.shields.io/badge/Firebase-Latest-orange.svg)](https://firebase.google.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[Live Demo](#) • [Documentation](#) • [Report Bug](#) • [Request Feature](#)
+[Live Demo](https://huggingface.co/spaces/sihabsafin/apex-ai) • [Documentation](#) • [Report Bug](#) • [Request Feature](#)
 
 </div>
 
