@@ -465,8 +465,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **[Your Name]**
 
 - 💼 LinkedIn: [Sihabul Islam Safin](https://www.linkedin.com/in/sihabsafin/)
-- 📧 Email: [sihabulislamsafin1@gmail.com](mailto:your.email@example.com)
-- 🐙 GitHub: [@sihabsafin](https://github.com/safin)
+- 📧 Email: [sihabulislamsafin1@gmail.com](mailto:sihabulislamsafin1@gmail.com)
+- 🐙 GitHub: [@sihabsafin](https://github.com/sihabsafin)
 
 ---
 
@@ -493,6 +493,6 @@ Built with amazing open-source tools:
 
 ---
 
-Made with ❤️ and ☕ by [Sihab Safin]
+Made with ❤️ and ☕ by Sihab Safin
 
 </div>
