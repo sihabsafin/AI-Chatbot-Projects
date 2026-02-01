@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 Apex AI
+# ⚡ Apex AI
 
 ### Enterprise RAG Chatbot Platform
 
