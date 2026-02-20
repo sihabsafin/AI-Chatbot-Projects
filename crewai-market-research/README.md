@@ -2,6 +2,7 @@
 
 A single-agent AI system that performs structured market research on any business idea. Built with CrewAI, Groq (LLaMA 3.3 70B), and deployed via Streamlit.
 
+Live Link: https://crewai-market-research.streamlit.app/
 ---
 
 ## What It Does
