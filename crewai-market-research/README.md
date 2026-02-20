@@ -106,16 +106,6 @@ crewai-market-research/
 
 ---
 
-## What's Next (Day 2+)
-
-This is Day 1 of a 15-day CrewAI learning program. Upcoming projects in this repo:
-
-- **Day 2** — Multi-agent crew: Research Agent + Report Writer Agent (Sequential process)
-- **Day 3** — Hierarchical process with a Manager Agent
-- **Day 5** — Tool use: agents that search the web in real time
-- **Day 10** — Full automation pipeline: input → research → analysis → PDF report
-
----
 
 ## Notes
 
