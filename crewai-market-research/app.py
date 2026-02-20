@@ -270,8 +270,10 @@ if run_btn:
         st.markdown('<div class="error-box">crewai not installed. Run:  pip install crewai</div>', unsafe_allow_html=True)
         st.stop()
 
-    # Dummy OpenAI key — CrewAI checks for it even when using Groq
-    os.environ.setdefault("OPENAI_API_KEY", "dummy-not-used")
+    # Set ALL required env vars before any crewai/litellm call
+    groq_api_key = os.environ.get("GROQ_API_KEY", "")
+    os.environ["GROQ_API_KEY"] = groq_api_key
+    os.environ["OPENAI_API_KEY"] = "dummy-not-used"   # CrewAI still checks for this
 
     model_id = MODELS[model_choice]
     role = agent_role.strip() or "Senior Market Research Analyst"
@@ -294,7 +296,7 @@ if run_btn:
     try:
         llm = LLM(
             model=model_id,
-            api_key=os.environ["GROQ_API_KEY"],
+            api_key=groq_api_key,
             temperature=0.7,
         )
 
