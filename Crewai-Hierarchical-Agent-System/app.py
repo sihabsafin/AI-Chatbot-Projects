@@ -9,11 +9,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ── Secrets ────────────────────────────────────────────────────────────────────
-try:
-    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
-except Exception:
-    pass
+# ── Secrets — load from Streamlit secrets or environment ───────────────────────
+for key in ["GEMINI_API_KEY", "GROQ_API_KEY"]:
+    try:
+        os.environ[key] = st.secrets[key]
+    except Exception:
+        pass  # falls back to whatever is already in os.environ
 os.environ.setdefault("OPENAI_API_KEY", "dummy-not-used")
 
 # ── CSS ────────────────────────────────────────────────────────────────────────
@@ -452,31 +453,56 @@ PRESETS = {
     "Custom Idea": "",
 }
 
-MODELS = {
-    "llama-3.3-70b-versatile (Recommended)": "groq/llama-3.3-70b-versatile",
-    "mixtral-8x7b-32768 (Balanced)":         "groq/mixtral-8x7b-32768",
-    "llama-3.1-8b-instant (Fast — low TPM)": "groq/llama-3.1-8b-instant",
+PROVIDERS = {
+    "Gemini (Recommended — no rate limits)": {
+        "gemini/gemini-2.0-flash":    "Gemini 2.0 Flash",
+        "gemini/gemini-1.5-flash":    "Gemini 1.5 Flash",
+        "gemini/gemini-1.5-pro":      "Gemini 1.5 Pro",
+    },
+    "Groq (Fallback — free tier has TPM limits)": {
+        "groq/llama-3.3-70b-versatile": "LLaMA 3.3 70B",
+        "groq/mixtral-8x7b-32768":      "Mixtral 8x7B",
+        "groq/llama-3.1-8b-instant":    "LLaMA 3.1 8B",
+    },
 }
 
-col1, col2 = st.columns([3, 2])
+col1, col2, col3 = st.columns([3, 2, 2])
 with col1:
     st.markdown('<span class="sec-label">Business Idea</span>', unsafe_allow_html=True)
     preset = st.selectbox("preset", list(PRESETS.keys()), label_visibility="collapsed")
 with col2:
-    st.markdown('<span class="sec-label">Groq Model</span>', unsafe_allow_html=True)
-    model_choice = st.selectbox("model", list(MODELS.keys()), label_visibility="collapsed")
+    st.markdown('<span class="sec-label">Provider</span>', unsafe_allow_html=True)
+    provider_choice = st.selectbox("provider", list(PROVIDERS.keys()), label_visibility="collapsed")
+with col3:
+    st.markdown('<span class="sec-label">Model</span>', unsafe_allow_html=True)
+    model_options = PROVIDERS[provider_choice]
+    model_id = st.selectbox(
+        "model",
+        list(model_options.keys()),
+        format_func=lambda x: model_options[x],
+        label_visibility="collapsed",
+    )
 
-# Rate limit notice
-st.markdown("""
-<div style="background:#0f1a0f;border:1px solid #1e3a1e;border-left:3px solid #3fb950;
-border-radius:5px;padding:0.6rem 1rem;margin:0.6rem 0 0.2rem;
-font-family:'Space Mono',monospace;font-size:0.65rem;color:#6a9f6a;line-height:1.6;">
-  ⚠ <b style="color:#3fb950">Free tier tip:</b>
-  This app uses 4 agents — token usage is high. Use <b>llama-3.3-70b-versatile</b> (6000 TPM)
-  or <b>mixtral-8x7b-32768</b>. Avoid <b>llama-3.1-8b-instant</b> on free tier — it has a lower per-minute limit.
-  If you hit a rate limit, wait ~30s and retry.
-</div>
-""", unsafe_allow_html=True)
+# Provider info strip
+is_gemini = model_id.startswith("gemini/")
+if is_gemini:
+    st.markdown("""
+    <div style="background:#0a1020;border:1px solid #1e2a3a;border-left:3px solid #58a6ff;
+    border-radius:5px;padding:0.55rem 1rem;margin:0.5rem 0 0.2rem;
+    font-family:'Space Mono',monospace;font-size:0.64rem;color:#6a8faf;line-height:1.6;">
+      ✦ <b style="color:#58a6ff">Gemini API:</b>
+      Generous free tier — no per-minute token limits for 4-agent crews.
+      Get your key at <b>aistudio.google.com/apikey</b> → add as <b>GEMINI_API_KEY</b> in Streamlit Secrets.
+    </div>""", unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <div style="background:#1a1205;border:1px solid #3a2a05;border-left:3px solid #d29922;
+    border-radius:5px;padding:0.55rem 1rem;margin:0.5rem 0 0.2rem;
+    font-family:'Space Mono',monospace;font-size:0.64rem;color:#9a7a35;line-height:1.6;">
+      ⚠ <b style="color:#d29922">Groq free tier:</b>
+      4-agent crews burn tokens fast — you may hit TPM limits.
+      Switch to Gemini above for uninterrupted runs.
+    </div>""", unsafe_allow_html=True)
 
 st.markdown('<span class="sec-label">Idea Description</span>', unsafe_allow_html=True)
 business_idea = st.text_area(
@@ -527,12 +553,19 @@ if run_btn:
         st.markdown('<div class="err-box">crewai not installed. Add it to requirements.txt</div>', unsafe_allow_html=True)
         st.stop()
 
-    groq_key = os.environ.get("GROQ_API_KEY", "")
-    if not groq_key:
-        st.markdown('<div class="err-box">⚠ GROQ_API_KEY not found. Set it in Streamlit → Settings → Secrets.</div>', unsafe_allow_html=True)
+    groq_key    = os.environ.get("GROQ_API_KEY", "")
+    gemini_key  = os.environ.get("GEMINI_API_KEY", "")
+    is_gemini   = model_id.startswith("gemini/")
+
+    if is_gemini and not gemini_key:
+        st.markdown('<div class="err-box">⚠ GEMINI_API_KEY not found. Add it in Streamlit → Settings → Secrets.<br>Get your key at aistudio.google.com/apikey</div>', unsafe_allow_html=True)
+        st.stop()
+    if not is_gemini and not groq_key:
+        st.markdown('<div class="err-box">⚠ GROQ_API_KEY not found. Add it in Streamlit → Settings → Secrets.</div>', unsafe_allow_html=True)
         st.stop()
 
-    model_id = MODELS[model_choice]
+    api_key = gemini_key if is_gemini else groq_key
+
     mi = manager_instructions.strip()
     rs = report_sections.strip()
 
@@ -563,7 +596,8 @@ if run_btn:
         </div>""", unsafe_allow_html=True)
 
     log = []
-    log.append((ts(), "SYS", "tag-sys", "Crew initialized · Process.hierarchical"))
+    provider_label = "gemini" if is_gemini else "groq"
+    log.append((ts(), "SYS", "tag-sys", f"Crew initialized · Process.hierarchical · {provider_label}"))
     render_log(log)
     time.sleep(0.4)
 
@@ -597,7 +631,7 @@ if run_btn:
     </div>""", unsafe_allow_html=True)
 
     try:
-        llm = LLM(model=model_id, api_key=groq_key, temperature=0.7)
+        llm = LLM(model=model_id, api_key=api_key, temperature=0.7)
 
         # ── Manager ────────────────────────────────────────────────────────────
         manager = Agent(
@@ -731,14 +765,14 @@ if run_btn:
         if "rate_limit" in err_str.lower() or "ratelimit" in err_str.lower() or "rate limit" in err_str.lower():
             st.markdown("""
             <div class="err-box">
-            ✗ <b>Groq Rate Limit Reached</b><br><br>
-            The free tier hit its token-per-minute (TPM) limit. This happens because
-            4 agents generate a lot of tokens.<br><br>
-            <b>Fix options:</b><br>
-            · Wait 30–60 seconds, then click Deploy Crew again<br>
-            · Switch to <b>llama-3.3-70b-versatile</b> (higher free-tier TPM)<br>
-            · Switch to <b>mixtral-8x7b-32768</b> as an alternative<br>
-            · Upgrade Groq to Dev tier at console.groq.com/settings/billing
+            ✗ <b>Rate Limit Reached</b><br><br>
+            Token-per-minute limit hit on Groq free tier — 4 agents generate a lot of tokens.<br><br>
+            <b>Recommended fix:</b><br>
+            · Switch provider to <b>Gemini</b> — much more generous free tier for multi-agent runs<br>
+            · Get key at <b>aistudio.google.com/apikey</b> → add as <b>GEMINI_API_KEY</b> in Streamlit Secrets<br><br>
+            <b>Or stay on Groq:</b><br>
+            · Wait 30–60 seconds and retry<br>
+            · Use <b>llama-3.3-70b-versatile</b> or <b>mixtral-8x7b-32768</b>
             </div>""", unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="err-box">✗ Error: {err_str}</div>', unsafe_allow_html=True)
