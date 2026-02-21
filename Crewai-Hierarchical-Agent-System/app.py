@@ -454,8 +454,8 @@ PRESETS = {
 
 MODELS = {
     "llama-3.3-70b-versatile (Recommended)": "groq/llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant (Fastest)": "groq/llama-3.1-8b-instant",
-    "mixtral-8x7b-32768 (Balanced)": "groq/mixtral-8x7b-32768",
+    "mixtral-8x7b-32768 (Balanced)":         "groq/mixtral-8x7b-32768",
+    "llama-3.1-8b-instant (Fast — low TPM)": "groq/llama-3.1-8b-instant",
 }
 
 col1, col2 = st.columns([3, 2])
@@ -465,6 +465,18 @@ with col1:
 with col2:
     st.markdown('<span class="sec-label">Groq Model</span>', unsafe_allow_html=True)
     model_choice = st.selectbox("model", list(MODELS.keys()), label_visibility="collapsed")
+
+# Rate limit notice
+st.markdown("""
+<div style="background:#0f1a0f;border:1px solid #1e3a1e;border-left:3px solid #3fb950;
+border-radius:5px;padding:0.6rem 1rem;margin:0.6rem 0 0.2rem;
+font-family:'Space Mono',monospace;font-size:0.65rem;color:#6a9f6a;line-height:1.6;">
+  ⚠ <b style="color:#3fb950">Free tier tip:</b>
+  This app uses 4 agents — token usage is high. Use <b>llama-3.3-70b-versatile</b> (6000 TPM)
+  or <b>mixtral-8x7b-32768</b>. Avoid <b>llama-3.1-8b-instant</b> on free tier — it has a lower per-minute limit.
+  If you hit a rate limit, wait ~30s and retry.
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown('<span class="sec-label">Idea Description</span>', unsafe_allow_html=True)
 business_idea = st.text_area(
@@ -710,7 +722,23 @@ if run_btn:
         </div>""", unsafe_allow_html=True)
 
     except Exception as e:
-        log.append((ts(), "ERR", "tag-sys", f"Execution failed"))
+        err_str = str(e)
+        log.append((ts(), "ERR", "tag-sys", "Execution failed"))
         render_log(log)
         status_placeholder.empty()
-        st.markdown(f'<div class="err-box">✗ Error: {str(e)}</div>', unsafe_allow_html=True)
+
+        # Friendly rate limit message
+        if "rate_limit" in err_str.lower() or "ratelimit" in err_str.lower() or "rate limit" in err_str.lower():
+            st.markdown("""
+            <div class="err-box">
+            ✗ <b>Groq Rate Limit Reached</b><br><br>
+            The free tier hit its token-per-minute (TPM) limit. This happens because
+            4 agents generate a lot of tokens.<br><br>
+            <b>Fix options:</b><br>
+            · Wait 30–60 seconds, then click Deploy Crew again<br>
+            · Switch to <b>llama-3.3-70b-versatile</b> (higher free-tier TPM)<br>
+            · Switch to <b>mixtral-8x7b-32768</b> as an alternative<br>
+            · Upgrade Groq to Dev tier at console.groq.com/settings/billing
+            </div>""", unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="err-box">✗ Error: {err_str}</div>', unsafe_allow_html=True)
