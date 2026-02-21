@@ -1,4 +1,4 @@
-#AI Business Intelligence — Live Data Intelligence
+## AI Business Intelligence — Live Data Intelligence
 
 AI agents that call real external APIs, parse live JSON responses, and generate structured analysis. No mock data. No hardcoded numbers. Every run fetches from the actual internet.
 
