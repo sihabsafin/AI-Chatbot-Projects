@@ -1,5 +1,5 @@
 # VentureIQ — AI Startup Due Diligence System
-- Live demo: [aibusinessintelligence.streamlit.app](https://ai-startup-due-diligence-system.streamlit.app/)
+- Live demo: [ventureiq.streamlit.app/](https://ventureiq.streamlit.app/)
 > Five specialist agents. One investment decision. 90 seconds.
 
 A multi-agent due diligence system built on CrewAI that analyzes any startup idea through four analytical lenses — market, financial, risk, and investment strategy — and delivers a structured report with a scored verdict and machine-readable JSON output.
