@@ -2,6 +2,8 @@
 
 AI agents that store knowledge in a vector database, retrieve it by semantic similarity, and ground every strategic recommendation in recalled facts — not LLM hallucinations.
 
+Live link: https://ai-business-strategy-memory-system.streamlit.app/
+
 Built as Day 6 of a 15-day CrewAI learning program — the day agents stopped forgetting everything between runs.
 
 ---
