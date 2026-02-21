@@ -1,733 +1,716 @@
 import streamlit as st
 import os
 import time
-from crewai import Agent, Task, Crew, Process, LLM
 
-# ─────────────────────────────────────────────
-#  PAGE CONFIG
-# ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="AgentFlow — Day 3 Hierarchical AI",
-    page_icon="👑",
-    layout="wide",
+    page_title="CrewAI · Command Center",
+    page_icon="⬡",
+    layout="centered",
     initial_sidebar_state="collapsed",
 )
 
-# ─────────────────────────────────────────────
-#  CUSTOM CSS
-# ─────────────────────────────────────────────
+# ── Secrets ────────────────────────────────────────────────────────────────────
+try:
+    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+except Exception:
+    pass
+os.environ.setdefault("OPENAI_API_KEY", "dummy-not-used")
+
+# ── CSS ────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap');
 
-/* ── Root Variables ── */
 :root {
-    --bg:        #080b10;
-    --bg2:       #0d1117;
-    --bg3:       #141922;
-    --border:    rgba(255,255,255,0.07);
-    --accent:    #f0c040;
-    --accent2:   #4af0a0;
-    --accent3:   #40a0f0;
-    --text:      #e8edf5;
-    --muted:     #6b7a92;
-    --manager:   #f0c040;
-    --research:  #4af0a0;
-    --strategy:  #40a0f0;
-    --output:    #c084fc;
+    --bg:        #080b0f;
+    --surface:   #0d1117;
+    --border:    #1c2330;
+    --border2:   #243040;
+    --text:      #c9d1d9;
+    --muted:     #3d4f63;
+    --accent:    #58a6ff;
+    --green:     #3fb950;
+    --amber:     #d29922;
+    --red:       #f85149;
+    --purple:    #bc8cff;
+    --mono:      'Space Mono', monospace;
+    --sans:      'DM Sans', sans-serif;
 }
 
-/* ── Global Reset ── */
+* { box-sizing: border-box; }
 html, body, [class*="css"] {
-    font-family: 'Syne', sans-serif;
+    font-family: var(--sans);
     background: var(--bg);
     color: var(--text);
 }
-.stApp { background: var(--bg); }
-
-/* ── Hide Streamlit chrome ── */
 #MainMenu, footer, header { visibility: hidden; }
-.block-container { padding: 2rem 3rem; max-width: 1400px; margin: 0 auto; }
+.block-container { padding: 2rem 1.8rem 5rem; max-width: 860px; }
 
-/* ── Hero Header ── */
-.hero {
-    text-align: center;
-    padding: 3rem 0 2rem;
-    position: relative;
+/* ── Top bar ── */
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
 }
-.hero-badge {
-    display: inline-block;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.2em;
+.topbar-left { display: flex; align-items: center; gap: 0.8rem; }
+.logo-hex {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+    flex-shrink: 0;
+}
+.app-name {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    font-weight: 700;
     color: var(--accent);
-    border: 1px solid var(--accent);
-    padding: 0.3rem 1rem;
-    border-radius: 2px;
-    margin-bottom: 1.2rem;
-    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
 }
-.hero h1 {
-    font-size: clamp(2.2rem, 5vw, 4rem);
-    font-weight: 800;
-    line-height: 1.05;
-    letter-spacing: -0.03em;
-    color: var(--text);
-    margin: 0 0 0.8rem;
-}
-.hero h1 span { color: var(--accent); }
-.hero-sub {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.82rem;
+.app-tagline {
+    font-family: var(--mono);
+    font-size: 0.58rem;
     color: var(--muted);
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
+}
+.day-pill {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--accent);
+    padding: 0.2rem 0.6rem;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
 }
 
-/* ── Architecture Diagram ── */
-.arch-wrap {
-    background: var(--bg2);
+/* ── Hierarchy diagram ── */
+.hier-wrap {
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.8rem 2rem;
-    margin: 2rem 0;
-    position: relative;
-    overflow: hidden;
+    border-radius: 8px;
+    padding: 1.4rem;
+    margin-bottom: 1.8rem;
 }
-.arch-wrap::before {
-    content: 'ARCHITECTURE';
-    position: absolute;
-    top: 1.2rem; right: 1.5rem;
-    font-family: 'Space Mono', monospace;
+.hier-title {
+    font-family: var(--mono);
     font-size: 0.6rem;
-    letter-spacing: 0.15em;
     color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
 }
-.arch-flow {
+.hier-row {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    flex-wrap: wrap;
+    margin-bottom: 0.4rem;
 }
-.arch-node {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.3rem;
-}
-.arch-icon {
-    width: 52px; height: 52px;
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.3rem;
+.node {
+    border-radius: 5px;
+    padding: 0.4rem 0.9rem;
+    font-family: var(--mono);
+    font-size: 0.68rem;
     font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+    white-space: nowrap;
 }
-.arch-icon.user   { background: rgba(255,255,255,0.06); }
-.arch-icon.mgr    { background: rgba(240,192,64,0.15); border: 1px solid rgba(240,192,64,0.4); }
-.arch-icon.res    { background: rgba(74,240,160,0.12); border: 1px solid rgba(74,240,160,0.35); }
-.arch-icon.str    { background: rgba(64,160,240,0.12); border: 1px solid rgba(64,160,240,0.35); }
-.arch-icon.out    { background: rgba(192,132,252,0.12); border: 1px solid rgba(192,132,252,0.35); }
-.arch-label {
-    font-size: 0.65rem;
-    font-family: 'Space Mono', monospace;
+.node-manager { background: #1a2a3a; border: 1px solid var(--accent); color: var(--accent); }
+.node-worker  { background: #0f1f10; border: 1px solid #2a4a2a; color: var(--green); }
+.node-output  { background: #1a1a2a; border: 1px solid #3a3a5a; color: var(--purple); }
+.hier-arrow { color: var(--muted); font-size: 0.75rem; font-family: var(--mono); }
+.hier-label {
+    font-family: var(--mono);
+    font-size: 0.58rem;
     color: var(--muted);
     text-align: center;
-    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
 }
-.arch-arrow { color: var(--border); font-size: 1.2rem; margin-top: -1rem; }
-.arch-arrow.down { transform: rotate(90deg); }
-
-/* ── Config Panel ── */
-.config-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.8rem;
-    margin-bottom: 1.5rem;
-}
-.section-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.65rem;
-    letter-spacing: 0.18em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 0.8rem;
+.hier-sublabel {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    color: #1c2a38;
+    text-align: center;
+    margin-top: 0.5rem;
 }
 
-/* ── Preset Buttons ── */
-.stButton > button {
-    background: var(--bg3) !important;
-    border: 1px solid var(--border) !important;
-    color: var(--text) !important;
-    border-radius: 8px !important;
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.72rem !important;
-    transition: all 0.2s !important;
-    padding: 0.5rem 0.8rem !important;
-    width: 100% !important;
-}
-.stButton > button:hover {
-    border-color: var(--accent) !important;
-    color: var(--accent) !important;
-    background: rgba(240,192,64,0.06) !important;
-}
-
-/* ── Run Button ── */
-.run-btn > button {
-    background: var(--accent) !important;
-    color: #000 !important;
-    border: none !important;
-    font-weight: 700 !important;
-    font-size: 0.9rem !important;
-    letter-spacing: 0.05em !important;
-    border-radius: 8px !important;
-    padding: 0.75rem 2rem !important;
-    width: 100% !important;
-    transition: opacity 0.2s !important;
-}
-.run-btn > button:hover { opacity: 0.85 !important; }
-
-/* ── Input overrides ── */
-.stTextArea textarea, .stTextInput input, .stSelectbox select {
-    background: var(--bg3) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
-    color: var(--text) !important;
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.82rem !important;
-}
-.stTextArea textarea:focus, .stTextInput input:focus {
-    border-color: var(--accent) !important;
-    box-shadow: 0 0 0 2px rgba(240,192,64,0.15) !important;
-}
-label, .stSelectbox label, .stTextArea label { color: var(--muted) !important; font-size: 0.8rem !important; }
-
-/* ── Agent Status Cards ── */
-.agent-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin: 1.5rem 0;
-}
-.agent-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1.2rem;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.3s;
-}
-.agent-card.manager  { border-top: 2px solid var(--manager); }
-.agent-card.research { border-top: 2px solid var(--research); }
-.agent-card.strategy { border-top: 2px solid var(--strategy); }
-.agent-card-icon { font-size: 1.6rem; margin-bottom: 0.5rem; }
-.agent-card-role {
-    font-family: 'Space Mono', monospace;
+/* ── Section label ── */
+.sec-label {
+    font-family: var(--mono);
     font-size: 0.62rem;
+    color: var(--muted);
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    margin-bottom: 0.2rem;
+    margin-bottom: 0.4rem;
+    display: block;
 }
-.agent-card.manager  .agent-card-role { color: var(--manager); }
-.agent-card.research .agent-card-role { color: var(--research); }
-.agent-card.strategy .agent-card-role { color: var(--strategy); }
-.agent-card-name { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.4rem; }
-.agent-card-desc { font-size: 0.72rem; color: var(--muted); line-height: 1.5; }
-.agent-status {
-    display: inline-flex;
+
+/* ── Inputs ── */
+.stTextInput input, .stTextArea textarea {
+    background: var(--surface) !important;
+    border: 1px solid var(--border2) !important;
+    border-radius: 5px !important;
+    color: var(--text) !important;
+    font-family: var(--sans) !important;
+    font-size: 0.88rem !important;
+    caret-color: var(--accent) !important;
+}
+.stTextInput input:focus, .stTextArea textarea:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px #58a6ff18 !important;
+}
+.stSelectbox div[data-baseweb="select"] {
+    background: var(--surface) !important;
+    border: 1px solid var(--border2) !important;
+    border-radius: 5px !important;
+}
+.stSelectbox div[data-baseweb="select"] > div {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    font-size: 0.88rem !important;
+}
+
+/* ── Button ── */
+.stButton > button {
+    background: var(--accent) !important;
+    color: var(--bg) !important;
+    border: none !important;
+    border-radius: 5px !important;
+    font-family: var(--mono) !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    padding: 0.65rem 2rem !important;
+    width: 100% !important;
+    transition: all 0.2s !important;
+}
+.stButton > button:hover {
+    background: #79b8ff !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ── Expander ── */
+.stExpander {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+}
+details summary { color: var(--muted) !important; font-size: 0.82rem !important; }
+
+/* ── Divider ── */
+.div { border: none; border-top: 1px solid var(--border); margin: 1.6rem 0; }
+
+/* ── Status bar ── */
+.status-bar {
+    display: flex;
     align-items: center;
-    gap: 0.35rem;
-    font-family: 'Space Mono', monospace;
+    gap: 0.7rem;
+    padding: 0.6rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    margin-bottom: 1.2rem;
+}
+.status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.dot-running { background: var(--amber); animation: blink 1.2s ease-in-out infinite; }
+.dot-done    { background: var(--green); }
+.dot-error   { background: var(--red); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.status-text {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--text);
+    flex: 1;
+}
+.status-meta {
+    font-family: var(--mono);
     font-size: 0.62rem;
-    margin-top: 0.8rem;
-    padding: 0.25rem 0.6rem;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.04);
     color: var(--muted);
 }
-.agent-status.active { color: var(--accent2); background: rgba(74,240,160,0.08); }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.status-dot.pulse { animation: pulse 1s infinite; }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-/* ── Progress / Log ── */
+/* ── Delegation log ── */
 .log-wrap {
-    background: var(--bg2);
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1.2rem 1.4rem;
-    margin: 1rem 0;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.75rem;
-    line-height: 1.8;
-    max-height: 280px;
-    overflow-y: auto;
-}
-.log-entry { display: flex; gap: 0.8rem; align-items: flex-start; }
-.log-ts { color: var(--muted); white-space: nowrap; flex-shrink: 0; }
-.log-msg { color: var(--text); }
-.log-msg.mgr  { color: var(--manager); }
-.log-msg.res  { color: var(--research); }
-.log-msg.str  { color: var(--strategy); }
-.log-msg.sys  { color: var(--muted); }
-
-/* ── Output Panels ── */
-.output-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.2rem;
-    margin-top: 1.5rem;
-}
-@media (max-width: 900px) { .output-grid { grid-template-columns: 1fr; } .agent-grid { grid-template-columns: 1fr; } }
-
-.output-panel {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 6px;
     overflow: hidden;
+    margin-bottom: 1rem;
 }
-.output-panel.full { grid-column: 1 / -1; }
-.panel-header {
-    padding: 0.9rem 1.2rem;
+.log-header {
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    padding: 0.7rem 1rem;
     border-bottom: 1px solid var(--border);
+    background: #0a0e14;
 }
-.panel-header.mgr  { background: rgba(240,192,64,0.07); }
-.panel-header.res  { background: rgba(74,240,160,0.07); }
-.panel-header.str  { background: rgba(64,160,240,0.07); }
-.panel-header.fin  { background: rgba(192,132,252,0.07); }
-.panel-icon { font-size: 1.1rem; }
-.panel-title {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.1em;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-.panel-header.mgr .panel-title { color: var(--manager); }
-.panel-header.res .panel-title { color: var(--research); }
-.panel-header.str .panel-title { color: var(--strategy); }
-.panel-header.fin .panel-title { color: var(--output); }
-.panel-body { padding: 1.2rem; font-size: 0.85rem; line-height: 1.75; color: var(--text); white-space: pre-wrap; }
-
-/* ── Divider ── */
-.divider {
-    height: 1px;
-    background: var(--border);
-    margin: 2rem 0;
-}
-
-/* ── Info Pills ── */
-.pill-row { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0.6rem 0 1.2rem; }
-.pill {
-    font-family: 'Space Mono', monospace;
+.log-header-title {
+    font-family: var(--mono);
     font-size: 0.62rem;
-    padding: 0.3rem 0.75rem;
-    border-radius: 4px;
-    letter-spacing: 0.08em;
+    color: var(--muted);
+    letter-spacing: 0.1em;
     text-transform: uppercase;
 }
-.pill.yellow { background: rgba(240,192,64,0.12); color: var(--accent); }
-.pill.green  { background: rgba(74,240,160,0.12); color: var(--accent2); }
-.pill.blue   { background: rgba(64,160,240,0.12); color: var(--accent3); }
-.pill.purple { background: rgba(192,132,252,0.12); color: var(--output); }
+.log-dot { width:6px; height:6px; border-radius:50%; background: var(--green); }
+.log-body {
+    padding: 0.8rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.log-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    line-height: 1.5;
+}
+.log-time { color: var(--muted); min-width: 52px; }
+.log-tag {
+    font-size: 0.58rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
+    white-space: nowrap;
+    margin-top: 0.1rem;
+}
+.tag-mgr  { background: #1a2a3a; color: var(--accent); }
+.tag-res  { background: #0f1f10; color: var(--green); }
+.tag-str  { background: #1c1a0a; color: var(--amber); }
+.tag-sys  { background: #1a1a2a; color: var(--purple); }
+.log-msg { color: var(--text); }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+/* ── Output panels ── */
+.out-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+.out-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.75rem 1.1rem;
+    border-bottom: 1px solid var(--border);
+    background: #0a0e14;
+}
+.out-agent-badge {
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.badge-mgr { background:#1a2a3a; color:var(--accent); }
+.badge-res { background:#0f1f10; color:var(--green); }
+.badge-str { background:#1c1a0a; color:var(--amber); }
+.out-panel-title {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+}
+.out-panel-body {
+    padding: 1.2rem 1.3rem;
+    font-family: var(--sans);
+    font-size: 0.87rem;
+    line-height: 1.8;
+    color: #b0bac6;
+    white-space: pre-wrap;
+}
+
+/* ── Stat chips ── */
+.stats-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 0.8rem 0 1.2rem;
+}
+.stat {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.2rem 0.6rem;
+}
+.stat b { color: var(--accent); font-weight: 700; }
+
+/* ── Error ── */
+.err-box {
+    background: #130a0a;
+    border: 1px solid #2a1010;
+    border-left: 3px solid var(--red);
+    border-radius: 5px;
+    padding: 0.9rem 1.2rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: #e06c75;
+    margin-top: 0.8rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-#  HERO
-# ─────────────────────────────────────────────
+
+# ── Top bar ────────────────────────────────────────────────────────────────────
 st.markdown("""
-<div class="hero">
-    <div class="hero-badge">⚡ Day 3 — Hierarchical Process</div>
-    <h1>Agent<span>Flow</span> Command</h1>
-    <p class="hero-sub">Manager Agent → Delegates → Workers Execute → Final Report</p>
+<div class="topbar">
+    <div class="topbar-left">
+        <div class="logo-hex"></div>
+        <div>
+            <div class="app-name">CREWAI COMMAND CENTER</div>
+            <div class="app-tagline">HIERARCHICAL · MANAGER → DELEGATE → EXECUTE</div>
+        </div>
+    </div>
+    <div class="day-pill">DAY 3</div>
 </div>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-#  ARCHITECTURE DIAGRAM
-# ─────────────────────────────────────────────
+
+# ── Hierarchy diagram ──────────────────────────────────────────────────────────
 st.markdown("""
-<div class="arch-wrap">
-    <div class="arch-flow">
-        <div class="arch-node">
-            <div class="arch-icon user">👤</div>
-            <div class="arch-label">User Input</div>
-        </div>
-        <div class="arch-arrow">→</div>
-        <div class="arch-node">
-            <div class="arch-icon mgr">👑</div>
-            <div class="arch-label">Manager Agent<br/>Orchestrates</div>
-        </div>
-        <div class="arch-arrow">→</div>
-        <div class="arch-node">
-            <div class="arch-icon res">🔬</div>
-            <div class="arch-label">Market<br/>Researcher</div>
-        </div>
-        <div class="arch-arrow">→</div>
-        <div class="arch-node">
-            <div class="arch-icon str">📈</div>
-            <div class="arch-label">Strategy<br/>Consultant</div>
-        </div>
-        <div class="arch-arrow">→</div>
-        <div class="arch-node">
-            <div class="arch-icon out">📋</div>
-            <div class="arch-label">Final<br/>Report</div>
+<div class="hier-wrap">
+    <div class="hier-title">◈ Agent Architecture — Hierarchical Process</div>
+    <div class="hier-row">
+        <div style="text-align:center">
+            <div class="node node-manager">Project Manager</div>
+            <div class="hier-label">allow_delegation=True</div>
         </div>
     </div>
+    <div class="hier-row" style="margin-top:0.3rem">
+        <div class="hier-arrow">↙</div>
+        <div class="hier-arrow" style="margin:0 1.5rem">↓</div>
+        <div class="hier-arrow">↘</div>
+    </div>
+    <div class="hier-row" style="gap:1rem">
+        <div style="text-align:center">
+            <div class="node node-worker">Research<br>Specialist</div>
+            <div class="hier-label">Worker Agent</div>
+        </div>
+        <div style="text-align:center">
+            <div class="node node-worker">Strategy<br>Consultant</div>
+            <div class="hier-label">Worker Agent</div>
+        </div>
+        <div style="text-align:center">
+            <div class="node node-worker">Report<br>Writer</div>
+            <div class="hier-label">Worker Agent</div>
+        </div>
+    </div>
+    <div class="hier-row" style="margin-top:0.5rem">
+        <div class="hier-arrow">↘</div>
+        <div class="hier-arrow" style="margin:0 1.5rem">↓</div>
+        <div class="hier-arrow">↙</div>
+    </div>
+    <div class="hier-row">
+        <div style="text-align:center">
+            <div class="node node-output">Final Business Report</div>
+            <div class="hier-label">Manager reviews + consolidates</div>
+        </div>
+    </div>
+    <div class="hier-sublabel">Manager never executes tasks directly — it delegates, reviews, and improves</div>
 </div>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-#  AGENT CARDS
-# ─────────────────────────────────────────────
-st.markdown("""
-<div class="agent-grid">
-    <div class="agent-card manager">
-        <div class="agent-card-icon">👑</div>
-        <div class="agent-card-role">Manager Agent</div>
-        <div class="agent-card-name">Project Orchestrator</div>
-        <div class="agent-card-desc">Analyzes business goals, breaks into subtasks, delegates to the right specialists, and reviews final output quality.</div>
-        <div class="agent-status"><span class="status-dot"></span> allow_delegation=True</div>
-    </div>
-    <div class="agent-card research">
-        <div class="agent-card-icon">🔬</div>
-        <div class="agent-card-role">Worker Agent</div>
-        <div class="agent-card-name">Market Research Specialist</div>
-        <div class="agent-card-desc">Delivers deep market sizing, trend analysis, competitor positioning, and customer profile breakdowns.</div>
-        <div class="agent-status"><span class="status-dot"></span> Awaiting Delegation</div>
-    </div>
-    <div class="agent-card strategy">
-        <div class="agent-card-icon">📈</div>
-        <div class="agent-card-role">Worker Agent</div>
-        <div class="agent-card-name">Business Strategy Consultant</div>
-        <div class="agent-card-desc">Converts research insights into monetization models, pricing strategies, go-to-market plans, and risk frameworks.</div>
-        <div class="agent-status"><span class="status-dot"></span> Awaiting Delegation</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-#  PRESETS
-# ─────────────────────────────────────────────
+# ── Presets + Model ────────────────────────────────────────────────────────────
 PRESETS = {
-    "🏠 AI Real Estate Analyzer": "An AI-powered real estate deal analyzer that helps investors evaluate properties, predict rental yields, estimate renovation ROI, and identify undervalued deals using computer vision and market data.",
-    "⚖️ AI Legal Document Assistant": "An AI SaaS platform for solo lawyers and small law firms that automates contract drafting, clause extraction, compliance checking, and legal research using LLMs.",
-    "💪 AI Fitness Coaching App": "A personalized AI fitness coaching app that integrates with wearables, creates adaptive workout plans, provides real-time form correction via camera, and adjusts nutrition guidance based on progress.",
-    "🛒 AI Dropshipping Research Tool": "An AI tool for ecommerce entrepreneurs that identifies winning products, analyzes competitor stores, predicts trend lifecycles, and automates Shopify product listings with optimized descriptions.",
+    "AI Real Estate Deal Analyzer": (
+        "An AI-powered real estate deal analyzer that helps property investors evaluate deals, "
+        "predict rental yields, identify undervalued markets, and flag risks — targeting serious "
+        "investors who evaluate 10+ deals per month."
+    ),
+    "AI Legal Contract Assistant": (
+        "An AI SaaS tool for solo lawyers and small law firms that automates contract review, "
+        "flags risky clauses, generates summaries, and suggests edits — cutting document review "
+        "time from hours to minutes."
+    ),
+    "AI Dropshipping Product Hunter": (
+        "An AI tool that helps Shopify dropshippers find winning products before they saturate, "
+        "analyzes competitor stores, predicts demand trends, and suggests optimal pricing — "
+        "targeting dropshippers doing $5k–$50k/month."
+    ),
+    "AI Personal Finance Coach": (
+        "An AI personal finance app that analyzes spending patterns, builds personalized savings "
+        "plans, predicts cashflow issues, and gives actionable weekly money advice — targeting "
+        "millennials aged 25–38 living paycheck to paycheck."
+    ),
+    "Custom Idea": "",
 }
 
-st.markdown('<div class="config-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-label">Quick Presets</div>', unsafe_allow_html=True)
+MODELS = {
+    "llama-3.3-70b-versatile (Recommended)": "groq/llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant (Fastest)": "groq/llama-3.1-8b-instant",
+    "mixtral-8x7b-32768 (Balanced)": "groq/mixtral-8x7b-32768",
+}
 
-cols = st.columns(4)
-for i, (label, desc) in enumerate(PRESETS.items()):
-    with cols[i]:
-        if st.button(label, key=f"preset_{i}"):
-            st.session_state["business_idea"] = desc
+col1, col2 = st.columns([3, 2])
+with col1:
+    st.markdown('<span class="sec-label">Business Idea</span>', unsafe_allow_html=True)
+    preset = st.selectbox("preset", list(PRESETS.keys()), label_visibility="collapsed")
+with col2:
+    st.markdown('<span class="sec-label">Groq Model</span>', unsafe_allow_html=True)
+    model_choice = st.selectbox("model", list(MODELS.keys()), label_visibility="collapsed")
 
-# Business idea input
-if "business_idea" not in st.session_state:
-    st.session_state["business_idea"] = ""
-
-st.markdown("---", unsafe_allow_html=True)
+st.markdown('<span class="sec-label">Idea Description</span>', unsafe_allow_html=True)
 business_idea = st.text_area(
-    "Business Idea",
-    value=st.session_state["business_idea"],
-    placeholder="Describe your business idea in detail...",
-    height=100,
-    key="idea_input",
+    "idea", value=PRESETS[preset], height=95,
+    placeholder="Describe the business idea in detail — the more specific, the better the output.",
+    label_visibility="collapsed",
 )
 
-# Model selection
-col1, col2 = st.columns(2)
-with col1:
-    model_choice = st.selectbox(
-        "LLM Model",
-        ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
-        help="70B = best quality, 8B = fastest",
+with st.expander("⚙  Advanced — Customize Manager Instructions"):
+    st.markdown('<span class="sec-label">Manager Task Instructions</span>', unsafe_allow_html=True)
+    manager_instructions = st.text_area(
+        "mi", height=110, label_visibility="collapsed",
+        value=(
+            "Analyze the business idea thoroughly. Delegate market research to the Research Specialist, "
+            "monetization and growth strategy to the Strategy Consultant, and final report writing to the "
+            "Report Writer. After all specialists complete their work, review the outputs, identify any "
+            "weak sections, and instruct improvements before delivering the final consolidated report."
+        ),
     )
-with col2:
-    manager_mode = st.selectbox(
-        "Manager Review Mode",
-        ["Standard — delegate and consolidate", "Strict — review and refine weak sections"],
-        help="Strict mode adds a quality review pass",
+    st.markdown('<span class="sec-label">Final Report Sections</span>', unsafe_allow_html=True)
+    report_sections = st.text_area(
+        "rs", height=130, label_visibility="collapsed",
+        value=(
+            "1. Executive Summary\n"
+            "2. Market Overview (size, growth, trends)\n"
+            "3. Target Customer Profile\n"
+            "4. Competitive Landscape\n"
+            "5. Monetization Strategy\n"
+            "6. Go-To-Market Plan\n"
+            "7. Key Risks & Mitigations\n"
+            "8. Final Recommendation"
+        ),
     )
 
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('<div class="div"></div>', unsafe_allow_html=True)
+run_btn = st.button("▶  DEPLOY CREW")
 
-# API Key
-with st.sidebar:
-    st.markdown("### ⚙️ Configuration")
-    api_key = st.text_input("Groq API Key", type="password", placeholder="gsk_...")
-    st.markdown("""
-    **How Hierarchical differs from Sequential:**
-    - Manager understands the full goal
-    - Manager *decides* which agent handles what
-    - Workers don't know the plan upfront
-    - Manager reviews quality before finalizing
-    
-    `Process.hierarchical` + `allow_delegation=True`
-    """)
 
-# ─────────────────────────────────────────────
-#  RUN BUTTON
-# ─────────────────────────────────────────────
-st.markdown('<div class="run-btn">', unsafe_allow_html=True)
-run = st.button("🚀 Launch Hierarchical Agent System", key="run_btn")
-st.markdown('</div>', unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-#  EXECUTION
-# ─────────────────────────────────────────────
-if run:
-    final_key = api_key or os.environ.get("GROQ_API_KEY", "")
-    if not final_key:
-        st.error("⚠️ Please enter your Groq API key in the sidebar.")
-        st.stop()
+# ── Execution ──────────────────────────────────────────────────────────────────
+if run_btn:
     if not business_idea.strip():
-        st.error("⚠️ Please enter a business idea.")
+        st.markdown('<div class="err-box">⚠ Please enter a business idea description.</div>', unsafe_allow_html=True)
         st.stop()
-
-    os.environ["GROQ_API_KEY"] = final_key
-
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    # Live log placeholder
-    log_ph = st.empty()
-    logs = []
-
-    def add_log(msg, kind="sys"):
-        ts = time.strftime("%H:%M:%S")
-        logs.append((ts, msg, kind))
-        html = '<div class="log-wrap">'
-        for t, m, k in logs[-20:]:
-            html += f'<div class="log-entry"><span class="log-ts">[{t}]</span><span class="log-msg {k}">{m}</span></div>'
-        html += '</div>'
-        log_ph.markdown(html, unsafe_allow_html=True)
-
-    add_log("Initializing hierarchical agent system...", "sys")
-
-    # ── Build LLM ──
-    llm = LLM(model=f"groq/{model_choice}", api_key=final_key)
-
-    # ── Manager description based on mode ──
-    review_instruction = (
-        "\n\nAfter all specialists complete their work, carefully review the outputs. "
-        "Identify any weak, vague, or incomplete sections and request improvements before delivering the final consolidated report."
-        if "Strict" in manager_mode else ""
-    )
-
-    # ── Agents ──
-    add_log("Spawning Manager Agent (allow_delegation=True)...", "mgr")
-
-    manager = Agent(
-        role="Project Manager",
-        goal="Analyze the business request, delegate tasks to the right specialists, and deliver a comprehensive consolidated business analysis.",
-        backstory=(
-            "You are a seasoned AI project manager with 20 years of experience running high-stakes business analysis projects. "
-            "You excel at breaking complex goals into focused subtasks, assigning them to the right specialists, "
-            "and synthesizing their outputs into clear executive-level reports."
-        ),
-        verbose=True,
-        allow_delegation=True,
-        llm=llm,
-    )
-
-    add_log("Spawning Market Research Specialist...", "res")
-
-    researcher = Agent(
-        role="Market Research Specialist",
-        goal="Provide exhaustive market analysis including market size, customer segments, competitor landscape, and growth opportunities.",
-        backstory=(
-            "You are a top-tier market research analyst who has conducted studies for Fortune 500 companies and Y Combinator startups alike. "
-            "You're known for uncovering non-obvious market opportunities and delivering data-rich, actionable insights."
-        ),
-        verbose=True,
-        allow_delegation=False,
-        llm=llm,
-    )
-
-    add_log("Spawning Business Strategy Consultant...", "str")
-
-    strategist = Agent(
-        role="Business Strategy Consultant",
-        goal="Design a complete business strategy including monetization, pricing, go-to-market, and risk mitigation.",
-        backstory=(
-            "You are an elite business strategy consultant who has helped scale dozens of B2B and B2C startups from 0 to $10M ARR. "
-            "You specialize in translating market research into concrete, executable business strategies."
-        ),
-        verbose=True,
-        allow_delegation=False,
-        llm=llm,
-    )
-
-    # ── Main Task (owned by Manager) ──
-    add_log("Creating hierarchical task — Manager owns and delegates...", "mgr")
-
-    main_task = Task(
-        description=f"""
-You are the Project Manager. A client has submitted the following business idea:
-
----
-{business_idea.strip()}
----
-
-Your job:
-1. DELEGATE market research to the Market Research Specialist — they must cover:
-   - Market size and growth trajectory
-   - Ideal customer profile (ICP) with 2–3 specific segments
-   - Top 3 competitors with their weaknesses
-   - 3 underserved market opportunities
-
-2. DELEGATE business strategy to the Business Strategy Consultant — they must cover:
-   - Recommended business model (B2B / B2C / marketplace / SaaS)
-   - Pricing tiers with specific price points
-   - Top 3 revenue streams
-   - 90-day go-to-market plan
-   - Top 3 risks with mitigation strategies
-
-3. CONSOLIDATE both outputs into a single polished executive report with clear sections.{review_instruction}
-
-Format your final output with these sections clearly labeled:
-## EXECUTIVE SUMMARY
-## MARKET RESEARCH FINDINGS  
-## BUSINESS STRATEGY
-## ACTION PLAN
-""",
-        expected_output=(
-            "A comprehensive business analysis report with four clearly labeled sections: "
-            "Executive Summary, Market Research Findings, Business Strategy, and Action Plan. "
-            "Each section should be detailed, specific, and directly relevant to the submitted business idea."
-        ),
-        agent=manager,
-    )
-
-    # ── Crew ──
-    add_log("Assembling Crew with Process.hierarchical...", "sys")
-
-    crew = Crew(
-        agents=[manager, researcher, strategist],
-        tasks=[main_task],
-        process=Process.hierarchical,
-        manager_agent=manager,
-        verbose=True,
-    )
-
-    add_log("🚀 Kickoff! Manager is analyzing and delegating...", "mgr")
-
-    result_placeholder = st.empty()
 
     try:
-        with st.spinner(""):
-            result = crew.kickoff()
-        add_log("✅ All agents completed. Consolidating report...", "sys")
-    except Exception as e:
-        add_log(f"❌ Error: {str(e)}", "sys")
-        st.error(f"Execution failed: {e}")
+        from crewai import Agent, Task, Crew, Process, LLM
+    except ImportError:
+        st.markdown('<div class="err-box">crewai not installed. Add it to requirements.txt</div>', unsafe_allow_html=True)
         st.stop()
 
-    result_str = str(result)
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    if not groq_key:
+        st.markdown('<div class="err-box">⚠ GROQ_API_KEY not found. Set it in Streamlit → Settings → Secrets.</div>', unsafe_allow_html=True)
+        st.stop()
 
-    # ── Parse sections ──
-    def extract_section(text, header, next_headers):
-        import re
-        pattern = re.compile(
-            rf"##\s*{re.escape(header)}\s*\n(.*?)(?={'|'.join([f'##.*?{re.escape(h)}' for h in next_headers])}|$)",
-            re.DOTALL | re.IGNORECASE,
+    model_id = MODELS[model_choice]
+    mi = manager_instructions.strip()
+    rs = report_sections.strip()
+
+    # Live delegation log
+    t0 = time.time()
+    log_placeholder = st.empty()
+    status_placeholder = st.empty()
+
+    def ts():
+        return f"{round(time.time() - t0, 1):>5}s"
+
+    def render_log(lines):
+        rows = ""
+        for t, tag, cls, msg in lines:
+            rows += f"""
+            <div class="log-line">
+                <span class="log-time">{t}</span>
+                <span class="log-tag {cls}">{tag}</span>
+                <span class="log-msg">{msg}</span>
+            </div>"""
+        log_placeholder.markdown(f"""
+        <div class="log-wrap">
+            <div class="log-header">
+                <div class="log-dot"></div>
+                <span class="log-header-title">Delegation Log</span>
+            </div>
+            <div class="log-body">{rows}</div>
+        </div>""", unsafe_allow_html=True)
+
+    log = []
+    log.append((ts(), "SYS", "tag-sys", "Crew initialized · Process.hierarchical"))
+    render_log(log)
+    time.sleep(0.4)
+
+    log.append((ts(), "MGR", "tag-mgr", f"Manager analyzing business idea…"))
+    render_log(log)
+    time.sleep(0.3)
+
+    log.append((ts(), "MGR", "tag-mgr", "Delegating market research → Research Specialist"))
+    render_log(log)
+    time.sleep(0.3)
+
+    log.append((ts(), "RES", "tag-res", "Research Specialist starting market analysis…"))
+    render_log(log)
+    time.sleep(0.3)
+
+    log.append((ts(), "MGR", "tag-mgr", "Delegating strategy → Business Strategy Consultant"))
+    render_log(log)
+    time.sleep(0.3)
+
+    log.append((ts(), "STR", "tag-str", "Strategy Consultant building monetization plan…"))
+    render_log(log)
+    time.sleep(0.3)
+
+    log.append((ts(), "MGR", "tag-mgr", "Delegating report → Report Writer"))
+    render_log(log)
+
+    status_placeholder.markdown("""
+    <div class="status-bar">
+        <div class="status-dot dot-running"></div>
+        <span class="status-text">Manager Agent coordinating crew — workers executing in parallel…</span>
+    </div>""", unsafe_allow_html=True)
+
+    try:
+        llm = LLM(model=model_id, api_key=groq_key, temperature=0.7)
+
+        # ── Manager ────────────────────────────────────────────────────────────
+        manager = Agent(
+            role="Project Manager",
+            goal=(
+                "Analyze the business request, delegate work to the right specialists, "
+                "review all outputs, and deliver a polished final business analysis report."
+            ),
+            backstory=(
+                "You are an elite AI project manager with 15+ years of experience running "
+                "complex business analysis projects. You are known for breaking ambiguous goals "
+                "into precise subtasks, assigning them to the right specialists, reviewing quality, "
+                "and delivering reports that are clear, structured, and actionable. You never do "
+                "research or strategy yourself — you orchestrate and improve."
+            ),
+            llm=llm,
+            allow_delegation=True,
+            verbose=False,
         )
-        m = pattern.search(text)
-        return m.group(1).strip() if m else ""
 
-    exec_summary  = extract_section(result_str, "EXECUTIVE SUMMARY",     ["MARKET RESEARCH", "BUSINESS STRATEGY", "ACTION PLAN"])
-    market_data   = extract_section(result_str, "MARKET RESEARCH FINDINGS", ["BUSINESS STRATEGY", "ACTION PLAN"])
-    strategy_data = extract_section(result_str, "BUSINESS STRATEGY",     ["ACTION PLAN"])
-    action_plan   = extract_section(result_str, "ACTION PLAN",           [])
+        # ── Workers ────────────────────────────────────────────────────────────
+        researcher = Agent(
+            role="Market Research Specialist",
+            goal="Deliver precise, data-grounded market analysis with competitor insights and opportunity gaps.",
+            backstory=(
+                "You are a Senior Market Research Specialist with 12 years at McKinsey and Gartner. "
+                "You produce concise, evidence-backed market analyses covering TAM/SAM/SOM, "
+                "competitor positioning, and unmet customer needs."
+            ),
+            llm=llm,
+            allow_delegation=False,
+            verbose=False,
+        )
 
-    # Fallback: show full result if parsing didn't find sections
-    if not any([exec_summary, market_data, strategy_data, action_plan]):
-        exec_summary = result_str
+        strategist = Agent(
+            role="Business Strategy Consultant",
+            goal="Turn research findings into a concrete monetization and growth strategy with clear priorities.",
+            backstory=(
+                "You are a startup strategy consultant who has advised 100+ ventures from seed to Series B. "
+                "You specialize in pricing models, revenue architecture, GTM sequencing, and risk management. "
+                "You think in 90-day sprints and always prioritize actions by impact-to-effort ratio."
+            ),
+            llm=llm,
+            allow_delegation=False,
+            verbose=False,
+        )
 
-    add_log("📊 Rendering structured report...", "sys")
+        report_writer = Agent(
+            role="Business Report Writer",
+            goal="Synthesize all research and strategy into a single, clean, executive-ready business report.",
+            backstory=(
+                "You are a business writer who has authored 200+ investor-ready company analyses "
+                "and startup reports. You transform raw research and strategy into structured, "
+                "readable documents that decision-makers trust immediately."
+            ),
+            llm=llm,
+            allow_delegation=False,
+            verbose=False,
+        )
 
-    # ── Render Output ──
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-    st.markdown("""
-    <div class="pill-row">
-        <span class="pill yellow">👑 Manager Orchestrated</span>
-        <span class="pill green">🔬 Research Completed</span>
-        <span class="pill blue">📈 Strategy Formulated</span>
-        <span class="pill purple">📋 Report Ready</span>
-    </div>
-    """, unsafe_allow_html=True)
+        # ── Main task — Manager owns and delegates ─────────────────────────────
+        main_task = Task(
+            description=(
+                f"{mi}\n\n"
+                f"Business Idea:\n'{business_idea}'\n\n"
+                f"The final report must include these sections:\n{rs}\n\n"
+                f"Ensure each section is specific, actionable, and evidence-based. "
+                f"Review outputs from all specialists and improve weak sections before finalizing."
+            ),
+            expected_output=(
+                f"A complete, polished business analysis report with these sections:\n{rs}\n\n"
+                f"Each section must be specific, data-driven, and immediately actionable. "
+                f"Minimum 2–3 substantive paragraphs or structured points per section."
+            ),
+            agent=manager,
+        )
 
-    # Executive Summary — full width
-    if exec_summary:
+        # ── Crew: Hierarchical ─────────────────────────────────────────────────
+        crew = Crew(
+            agents=[manager, researcher, strategist, report_writer],
+            tasks=[main_task],
+            process=Process.hierarchical,
+            manager_llm=llm,
+            verbose=False,
+        )
+
+        result = crew.kickoff()
+        elapsed = round(time.time() - t0, 1)
+
+        # Final log entries
+        log.append((ts(), "WRI", "tag-sys", "Report Writer consolidating final output…"))
+        log.append((ts(), "MGR", "tag-mgr", "Manager reviewing and approving report…"))
+        log.append((ts(), "SYS", "tag-sys", f"✓ Crew complete in {elapsed}s"))
+        render_log(log)
+
+        # Status
+        status_placeholder.markdown(f"""
+        <div class="status-bar">
+            <div class="status-dot dot-done"></div>
+            <span class="status-text">Mission complete — manager approved final report</span>
+            <span class="status-meta">{elapsed}s</span>
+        </div>""", unsafe_allow_html=True)
+
+        # Stats
         st.markdown(f"""
-        <div class="output-panel full">
-            <div class="panel-header mgr">
-                <span class="panel-icon">👑</span>
-                <span class="panel-title">Executive Summary — Manager Consolidated</span>
-            </div>
-            <div class="panel-body">{exec_summary}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        <div class="stats-row">
+            <div class="stat">agents <b>4</b></div>
+            <div class="stat">process <b>hierarchical</b></div>
+            <div class="stat">tasks <b>1 → delegated</b></div>
+            <div class="stat">elapsed <b>{elapsed}s</b></div>
+            <div class="stat">model <b>{model_id.split("/")[1]}</b></div>
+        </div>""", unsafe_allow_html=True)
 
-    # Two-column: Research + Strategy
-    col_a, col_b = st.columns(2)
-    with col_a:
+        # Output panel
         st.markdown(f"""
-        <div class="output-panel">
-            <div class="panel-header res">
-                <span class="panel-icon">🔬</span>
-                <span class="panel-title">Market Research Findings</span>
+        <div class="out-panel">
+            <div class="out-panel-header">
+                <span class="out-agent-badge badge-mgr">Manager · Final Report</span>
+                <span class="out-panel-title">Business Analysis — reviewed &amp; approved by Manager Agent</span>
             </div>
-            <div class="panel-body">{market_data or "See full report below."}</div>
-        </div>
-        """, unsafe_allow_html=True)
+            <div class="out-panel-body">{str(result)}</div>
+        </div>""", unsafe_allow_html=True)
 
-    with col_b:
-        st.markdown(f"""
-        <div class="output-panel">
-            <div class="panel-header str">
-                <span class="panel-icon">📈</span>
-                <span class="panel-title">Business Strategy</span>
-            </div>
-            <div class="panel-body">{strategy_data or "See full report below."}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # Action Plan — full width
-    if action_plan:
-        st.markdown(f"""
-        <div class="output-panel full" style="margin-top:1.2rem">
-            <div class="panel-header fin">
-                <span class="panel-icon">🎯</span>
-                <span class="panel-title">90-Day Action Plan</span>
-            </div>
-            <div class="panel-body">{action_plan}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # Full raw output expander
-    with st.expander("📄 Full Raw Report"):
-        st.text(result_str)
-
-    # Download
-    st.download_button(
-        label="⬇️ Download Full Report (.txt)",
-        data=result_str,
-        file_name="agentflow_day3_report.txt",
-        mime="text/plain",
-    )
-
-    add_log("🎉 Done! Report delivered.", "sys")
+    except Exception as e:
+        log.append((ts(), "ERR", "tag-sys", f"Execution failed"))
+        render_log(log)
+        status_placeholder.empty()
+        st.markdown(f'<div class="err-box">✗ Error: {str(e)}</div>', unsafe_allow_html=True)
