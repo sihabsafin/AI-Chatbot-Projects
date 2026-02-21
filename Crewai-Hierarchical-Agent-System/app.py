@@ -10,11 +10,16 @@ st.set_page_config(
 )
 
 # ── Secrets — load from Streamlit secrets or environment ───────────────────────
-for key in ["GEMINI_API_KEY", "GROQ_API_KEY"]:
+for secret_key in ["GEMINI_API_KEY", "GROQ_API_KEY"]:
     try:
-        os.environ[key] = st.secrets[key]
+        os.environ[secret_key] = st.secrets[secret_key]
     except Exception:
-        pass  # falls back to whatever is already in os.environ
+        pass
+
+# LiteLLM uses GOOGLE_API_KEY for Gemini — map from GEMINI_API_KEY
+if os.environ.get("GEMINI_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
+
 os.environ.setdefault("OPENAI_API_KEY", "dummy-not-used")
 
 # ── CSS ────────────────────────────────────────────────────────────────────────
@@ -455,9 +460,9 @@ PRESETS = {
 
 PROVIDERS = {
     "Gemini (Recommended)": {
-        "gemini/gemini-1.5-flash":    "Gemini 1.5 Flash  ✓ Free tier",
-        "gemini/gemini-2.5-flash-preview-04-17": "Gemini 2.5 Flash  ✓ Free tier",
-        "gemini/gemini-1.5-pro":      "Gemini 1.5 Pro  ✓ Free tier",
+        "gemini/gemini-1.5-flash-latest":   "Gemini 1.5 Flash  ✓ Free tier",
+        "gemini/gemini-1.5-pro-latest":     "Gemini 1.5 Pro  ✓ Free tier",
+        "gemini/gemini-2.5-flash-preview-04-17": "Gemini 2.5 Flash Preview  ✓ Free tier",
     },
     "Groq (Fallback — TPM limits apply)": {
         "groq/llama-3.3-70b-versatile": "LLaMA 3.3 70B",
@@ -631,7 +636,15 @@ if run_btn:
     </div>""", unsafe_allow_html=True)
 
     try:
-        llm = LLM(model=model_id, api_key=api_key, temperature=0.7)
+        # LiteLLM needs GOOGLE_API_KEY set in env for Gemini
+        if is_gemini:
+            os.environ["GOOGLE_API_KEY"] = api_key
+
+        llm = LLM(
+            model=model_id,
+            api_key=api_key,
+            temperature=0.7,
+        )
 
         # ── Manager ────────────────────────────────────────────────────────────
         manager = Agent(
