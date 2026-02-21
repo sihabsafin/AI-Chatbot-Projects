@@ -1,7 +1,7 @@
 # CrewAI Multi-Agent Business Planner
 
 A two-agent AI system that separates market research and business strategy into specialized roles. Built with CrewAI, Groq (LLaMA 3.3 70B), and deployed via Streamlit.
-
+Live Link: https://crewai-multiagent.streamlit.app/
 ---
 
 ## What It Does
